@@ -1,9 +1,38 @@
 <script>
+    import { onMount } from "svelte";
+
     let board = [
         [null, null, null],
         [null, null, null],
         [null, null, null],
     ];
+
+    let socket = null;
+    let intervalId = null;
+
+    onMount(() => {
+        socket = new WebSocket("ws://127.0.0.1:8080/ws");
+        console.log("Attempting Connection...");
+
+        socket.onopen = () => {
+            console.log("Successfully Connected");
+            // socket.send("e")
+        };
+
+        socket.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            socket.send("Client Closed!")
+        };
+
+        socket.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+        socket.onmessage = message => {
+            console.log(message);
+        }
+
+    })
 
     let draggedElement = null;
     let numPieces = 8;
@@ -20,11 +49,18 @@
     }
 
     function drag(event) {
-        console.log(event.target);
         event.dataTransfer.setData("piece", event.target.id);
         draggedElement = event.target;
         dragging = true;
-        console.log("draggin");
+        intervalId = setInterval(() => {
+            // socket.send("hotdogs")
+            socket.send(JSON.stringify({
+                "ClientX": 1.1,
+                "ClientY": 1.2,
+                "PlayerNumber": 0,
+                "PieceID": "Big Piece"
+            }));
+        }, 200);
     }
 
     function allowDrop(event) {
@@ -65,14 +101,15 @@
         event.preventDefault();
         const data = event.dataTransfer.getData("piece");
         let piece = document.getElementById(data);
+        let target = event.target;
 
         if (!draggedElement) {
             return;
         }
 
         // check if target is a cell
-        if (event.target.getAttribute("class").includes("draggable")) {
-            let parent = event.target.parentElement;
+        if (target.getAttribute("class").includes("draggable")) {
+            let parent = target.parentElement;
             parent.setAttribute("style", "");
             if (!isValidMove(piece, parent.firstElementChild)) {
                 return;
@@ -80,20 +117,24 @@
             parent.removeChild(parent.firstElementChild);
             parent.appendChild(piece);
             piece.setAttribute("draggable", null);
+            updateBoard(piece.getAttribute("id"), parent.getAttribute("id"));
+            checkForWin();
             return;
         }
 
-        event.target.setAttribute("style", "");
+        target.setAttribute("style", "");
         // check if cell is empty
-        if (event.target.firstElementChild != null) {
-            if (!isValidMove(piece, event.target.firstElementChild)) {
+        if (target.firstElementChild != null) {
+            if (!isValidMove(piece, target.firstElementChild)) {
                 return;
             }
-            event.target.removeChild(event.target.firstElementChild);
+            target.removeChild(target.firstElementChild);
         }
-        event.target.appendChild(piece);
-        event.target.setAttribute("style", "background-color: ");
+        target.appendChild(piece);
+        target.setAttribute("style", "background-color: ");
         piece.setAttribute("draggable", false);
+        updateBoard(piece.getAttribute("id"), target.getAttribute("id"));
+        checkForWin();
     }
 
     function isValidMove(piece, target) {
@@ -106,6 +147,7 @@
     function dragEnd() {
         dragging = false;
         draggedElement = null;
+        clearInterval(intervalId);
     }
 
     function dragLeave(event) {
@@ -121,8 +163,51 @@
             event.preventDefault();
         }
     }
+
+    function updateBoard(piece, cell) {
+        const pieceData = Number(piece.split(",")[0]);
+        const cellNumber = Number(cell);
+
+        const x = Math.trunc(cellNumber / 3);
+        const y = cellNumber % 3;
+        board[x][y] = pieceData;
+        console.log(board);
+    }
+
+    // trash algo
+    function checkForWin() {
+        // Check rows
+        board.forEach((row) => {
+            const sum = row.reduce((acc, current) => acc + current, 0);
+            if (checkSum(sum)) return;
+        });
+
+        // Check columns
+        for (let i = 0; i < 3; i++) {
+            const sum = board[0][i] + board[1][i] + board[2][i];
+            if (checkSum(sum)) return;
+        }
+
+        // Check diagonals
+        let sum = board[0][0] + board[1][1] + board[2][2];
+        if (checkSum(sum)) return;
+        sum = board[0][2] + board[1][1] + board[2][0];
+        if (checkSum(sum)) return;
+    }
+
+    function checkSum(sum) {
+        if (sum == 3) {
+            alert("player 1 win");
+            return true;
+        } else if (sum == -3) {
+            alert("player -1 win");
+            return true;
+        }
+        return false;
+    }
 </script>
 
+<!-- Create draggable elements -->
 <div id="container" class="w-screen bg-slate-200 gap-4 h-screen flex flex-col items-center justify-center">
     <div class="pieces-container">
         {#each pieces as piece (piece.size)}
@@ -131,7 +216,7 @@
                 style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
                 size={piece.size}
                 draggable="true"
-                id={"X" + piece.size}
+                id={"-1," + piece.size}
                 on:dragstart={drag}
                 on:dragend={dragEnd}
                 on:mousedown={mouseDown}
@@ -143,102 +228,23 @@
         {/each}
     </div>
 
+    <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
     <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
-        <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-        <div
-            class="cell z-10"
-            cell="0"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="1"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="2"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="3"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="4"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="5"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="6"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="7"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
-        <div
-            class="cell z-10"
-            cell="8"
-            on:dragleave={dragLeave}
-            on:drop={drop}
-            on:dragover={allowDrop}
-            on:drag={(e) => console.log("asd")}
-            role="gridcell"
-            draggable="false"
-            tabindex="0"
-        />
+        {#each Array(9) as _, index (index)}
+            <div
+                class="cell z-10"
+                id={index}
+                on:dragleave={dragLeave}
+                on:drop={drop}
+                on:dragover={allowDrop}
+                role="gridcell"
+                draggable="false"
+                tabindex="0"
+            />
+        {/each}
     </div>
 
-    <!-- Create a draggable element -->
+    <!-- Create draggable elements -->
     <div class="pieces-container">
         {#each pieces as piece (piece.size)}
             <div
@@ -246,7 +252,7 @@
                 style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
                 size={piece.size}
                 draggable="true"
-                id={"O" + piece.size}
+                id={"1," + piece.size}
                 on:dragstart={drag}
                 on:dragend={dragEnd}
                 on:mousedown={mouseDown}
