@@ -9,14 +9,19 @@
 
     let socket = null;
     let intervalId = null;
+    let playerNumber = null;
 
     onMount(() => {
+        // document.addEventListener("mousemove", handleMouseMove)
         socket = new WebSocket("ws://127.0.0.1:8080/ws");
         console.log("Attempting Connection...");
 
         socket.onopen = () => {
             console.log("Successfully Connected");
-            // socket.send("e")
+            socket.send(JSON.stringify({
+                "EventType": "connect",
+                "data": null
+            }))
         };
 
         socket.onclose = event => {
@@ -29,7 +34,19 @@
         };
 
         socket.onmessage = message => {
-            console.log(message);
+            const received = JSON.parse(message.data);
+            const eventType = received.EventType;
+            const data = received.Data
+            console.log("eventType")
+            // console.log(data);
+            switch (eventType) {
+                case "connect":
+                    playerNumber = data.Id;
+                    break;
+                case "move":
+                    console.log("moving");
+                    break;
+            }
         }
 
     })
@@ -48,20 +65,44 @@
         });
     }
 
-    function drag(event) {
+    function dragStart(event) {
         event.dataTransfer.setData("piece", event.target.id);
         draggedElement = event.target;
         dragging = true;
-        intervalId = setInterval(() => {
-            // socket.send("hotdogs")
-            socket.send(JSON.stringify({
-                "ClientX": 1.1,
-                "ClientY": 1.2,
-                "PlayerNumber": 0,
-                "PieceID": "Big Piece"
-            }));
-        }, 200);
     }
+
+    function drag(event) {
+        // console.log(event.clientX)
+        // console.log(event.clientY)
+        // intervalId = setInterval(() => {
+        //     // socket.send("hotdogs")
+        //     console.log("------- coordinates -------")
+        //     console.log(event.clientX)
+        //     console.log(event.clientY)
+            socket.send(JSON.stringify({
+                "EventType": "move",
+                "data": {
+                    "ClientX": event.clientX,
+                    "ClientY": event.clientY,
+                    "PlayerNumber": playerNumber,
+                    "PieceID": "Big Piece"
+                }
+            }));
+        // }, 200);
+    }
+
+    // Move the element according to the mouse pointer's position
+
+    // const handleMouseMove = (e) => {
+    //     console.log('asdasd')
+    //     if (dragging) {
+    //         const x = e.clientX - offsetX;
+    //         const y = e.clientY - offsetY;
+    //         console.log(x, y)
+    //         // draggable.style.left = x + "px";
+    //         // draggable.style.top = y + "px";
+    //     }
+    // }
 
     function allowDrop(event) {
         event.preventDefault();
@@ -173,7 +214,7 @@
         board[x][y] = pieceData;
         console.log(board);
     }
-
+ 
     // trash algo
     function checkForWin() {
         // Check rows
@@ -217,7 +258,8 @@
                 size={piece.size}
                 draggable="true"
                 id={"-1," + piece.size}
-                on:dragstart={drag}
+                on:drag={drag}
+                on:dragstart={dragStart}
                 on:dragend={dragEnd}
                 on:mousedown={mouseDown}
                 role="gridcell"
@@ -253,7 +295,8 @@
                 size={piece.size}
                 draggable="true"
                 id={"1," + piece.size}
-                on:dragstart={drag}
+                on:drag={drag}
+                on:dragstart={dragStart}
                 on:dragend={dragEnd}
                 on:mousedown={mouseDown}
                 role="gridcell"
