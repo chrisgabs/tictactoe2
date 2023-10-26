@@ -11,46 +11,6 @@
     let intervalId = null;
     let playerNumber = null;
 
-    onMount(() => {
-        // document.addEventListener("mousemove", handleMouseMove)
-        socket = new WebSocket("ws://127.0.0.1:8080/ws");
-        console.log("Attempting Connection...");
-
-        socket.onopen = () => {
-            console.log("Successfully Connected");
-            socket.send(JSON.stringify({
-                "EventType": "connect",
-                "data": null
-            }))
-        };
-
-        socket.onclose = event => {
-            console.log("Socket Closed Connection: ", event);
-            socket.send("Client Closed!")
-        };
-
-        socket.onerror = error => {
-            console.log("Socket Error: ", error);
-        };
-
-        socket.onmessage = message => {
-            const received = JSON.parse(message.data);
-            const eventType = received.EventType;
-            const data = received.Data
-            console.log("eventType")
-            // console.log(data);
-            switch (eventType) {
-                case "connect":
-                    playerNumber = data.Id;
-                    break;
-                case "move":
-                    console.log("moving");
-                    break;
-            }
-        }
-
-    })
-
     let draggedElement = null;
     let numPieces = 8;
     let pieces = [];
@@ -58,11 +18,90 @@
     let minSize = 20;
     let dragging = false;
 
+    let mouseX = 0;
+    let mouseY = 0;
+
+    onMount(() => {
+        // document.addEventListener("mousemove", handleMouseMove)
+        socket = new WebSocket("ws://127.0.0.1:8080/ws");
+        console.log("Attempting Connection...");
+
+        socket.onopen = () => {
+            console.log("Successfully Connected");
+            socket.send(
+                JSON.stringify({
+                    EventType: "connect",
+                    data: null,
+                })
+            );
+        };
+
+        socket.onclose = (event) => {
+            console.log("Socket Closed Connection: ", event);
+            socket.send("Client Closed!");
+        };
+
+        socket.onerror = (error) => {
+            console.log("Socket Error: ", error);
+        };
+
+        socket.onmessage = (message) => {
+            const received = JSON.parse(message.data);
+            const eventType = received.EventType;
+            const data = received.Data;
+            // console.log(data);
+            switch (eventType) {
+                case "connect":
+                    playerNumber = data.Id;
+                    break;
+                case "move":
+                    // console.log(data);
+                    handleOpponentMouseMove(data);
+                    break;
+            }
+        };
+
+        setInterval(() => {
+            if (draggedElement != null) {
+                socket.send(
+                    JSON.stringify({
+                        EventType: "move",
+                        data: {
+                            ClientX: mouseX,
+                            ClientY: mouseY,
+                            PlayerNumber: playerNumber,
+                            PieceID: "Big Piece",
+                        },
+                    })
+                );
+            }
+        }, 100);
+
+        document.addEventListener("dragover", (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+    });
+
     let sizeIncrements = (maxSize - minSize) / numPieces;
     for (let i = 1; i != numPieces + 1; i++) {
         pieces.push({
             size: parseInt(i * sizeIncrements) + minSize,
         });
+    }
+    
+    // data: {
+    //     ClientX: mouseX,
+    //     ClientY: mouseY,
+    //     PlayerNumber: playerNumber,
+    //     PieceID: "Big Piece",
+    // },
+    function handleOpponentMouseMove(data) {
+        const cursorElement = document.getElementById("cursor");
+        // console.log(data.ClientX, data.clientY);
+        // cursorElement.style.left = data.ClientX + "px";
+        // cursorElement.style.top = data.ClientY + "px";
+        cursorElement.style.transform = `translate(${data.ClientX}px, ${data.ClientY}px)`;
     }
 
     function dragStart(event) {
@@ -72,37 +111,10 @@
     }
 
     function drag(event) {
-        // console.log(event.clientX)
-        // console.log(event.clientY)
-        // intervalId = setInterval(() => {
-        //     // socket.send("hotdogs")
-        //     console.log("------- coordinates -------")
-        //     console.log(event.clientX)
-        //     console.log(event.clientY)
-            socket.send(JSON.stringify({
-                "EventType": "move",
-                "data": {
-                    "ClientX": event.clientX,
-                    "ClientY": event.clientY,
-                    "PlayerNumber": playerNumber,
-                    "PieceID": "Big Piece"
-                }
-            }));
-        // }, 200);
+        return;
+        // mouseX = event.clientX;
+        // mouseY = event.clientY;
     }
-
-    // Move the element according to the mouse pointer's position
-
-    // const handleMouseMove = (e) => {
-    //     console.log('asdasd')
-    //     if (dragging) {
-    //         const x = e.clientX - offsetX;
-    //         const y = e.clientY - offsetY;
-    //         console.log(x, y)
-    //         // draggable.style.left = x + "px";
-    //         // draggable.style.top = y + "px";
-    //     }
-    // }
 
     function allowDrop(event) {
         event.preventDefault();
@@ -214,7 +226,7 @@
         board[x][y] = pieceData;
         console.log(board);
     }
- 
+
     // trash algo
     function checkForWin() {
         // Check rows
@@ -247,6 +259,8 @@
         return false;
     }
 </script>
+
+<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor"></div>
 
 <!-- Create draggable elements -->
 <div id="container" class="w-screen bg-slate-200 gap-4 h-screen flex flex-col items-center justify-center">
