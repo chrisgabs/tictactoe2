@@ -19,6 +19,9 @@
     let minSize = 20;
     let dragging = false;
 
+    let ogOpponentPieceCoords = null;
+    let opponentDragging = false;
+
     let mouseX = 0;
     let mouseY = 0;
 
@@ -48,9 +51,10 @@
 
         socket.onmessage = (message) => {
             const received = JSON.parse(message.data);
+            // console.log(received);
             const eventType = received.EventType;
             const data = received.Data;
-            // console.log(data);
+            console.log(eventType);
             switch (eventType) {
                 case "connect":
                     playerNumber = data.Id;
@@ -59,6 +63,13 @@
                 case "move":
                     // console.log(data);
                     handleOpponentMouseMove(data);
+                    break;
+                case "dragend":
+                    handleOpponentDragEnd(data);
+                    break;
+                case "drop":
+                    console.log(received)
+                    handleOpponentDrop(data);
                     break;
             }
         };
@@ -72,7 +83,7 @@
                             ClientX: mouseX,
                             ClientY: mouseY,
                             PlayerNumber: playerNumber,
-                            PieceID: "Big Piece",
+                            PieceID: draggedElement.getAttribute("id"),
                         },
                     })
                 );
@@ -80,6 +91,15 @@
         }, 100);
 
     });
+
+    function handleOpponentDrop(data) {
+        console.log("opponent dropped");
+        console.log(data)
+    }
+    
+    function handleOpponentDragEnd(data) {
+        opponentDragging = false;
+    }
 
     function setUpBoardData(playerNumber) {
         // compute piece sizes
@@ -103,17 +123,21 @@
         console.log(tileIds)
     }
 
-    // data: {
-    //     ClientX: mouseX,
-    //     ClientY: mouseY,
-    //     PlayerNumber: playerNumber,
-    //     PieceID: "Big Piece",
-    // },
     function handleOpponentMouseMove(data) {
         const cursorElement = document.getElementById("cursor");
+        const opponentPiece = document.getElementById("opponent-" + data.PieceID);
+        if (!opponentDragging) {
+            ogOpponentPieceCoords = opponentPiece.getBoundingClientRect();
+            opponentDragging = true;
+        }
         // Could be optimized. Maybe only update gameBounds if screen is resized or magnified.
         const gameBounds = document.getElementById("game-bounds").getBoundingClientRect();
         cursorElement.style.transform = `translate(${data.ClientX + gameBounds.x}px, ${data.ClientY + gameBounds.y}px)`;
+        // place relative to game area - offset original position of piece - estimate opponent's pointer coordinates in middle
+        // TODO: accurately calculate pointer coordinates of opponent
+        const pieceX = (data.ClientX + gameBounds.x) - ogOpponentPieceCoords.x - (ogOpponentPieceCoords.width/2);
+        const pieceY = (data.ClientY + gameBounds.y) - ogOpponentPieceCoords.y - (ogOpponentPieceCoords.height/2);
+        opponentPiece.style.transform = `translate(${pieceX}px, ${pieceY}px)`;
     }
 
     function updateMouseCoordinates(event) {
@@ -139,23 +163,11 @@
         event.preventDefault();
         if (dragging && draggedElement) {
             dragging = false;
-            let target = event.target;
-            // check if target is a cell
-            if (target.getAttribute("class").includes("draggable")) {
-                let parent = event.target.parentElement;
-                if (isValidMove(draggedElement, parent.firstElementChild)) {
-                    target.parentElement.setAttribute("style", "background-color: rgb(232, 255, 223)");
-                    console.log("valid1");
-                    return;
-                }
-                target.parentElement.setAttribute("style", "background-color: rgb(255, 223, 223)");
-                console.log("invalid1");
-                return;
-            }
+            let target = event.currentTarget;
 
             // check if cell is not empty
             if (target.firstElementChild != null) {
-                if (isValidMove(draggedElement, event.target.firstElementChild)) {
+                if (isValidMove(draggedElement, target.firstElementChild)) {
                     target.setAttribute("style", "background-color: rgb(232, 255, 223)");
                     console.log("valid2");
                     return;
@@ -173,24 +185,9 @@
         event.preventDefault();
         const data = event.dataTransfer.getData("piece");
         let piece = document.getElementById(data);
-        let target = event.target;
+        let target = event.currentTarget;
 
         if (!draggedElement) {
-            return;
-        }
-
-        // check if target is a cell
-        if (target.getAttribute("class").includes("draggable")) {
-            let parent = target.parentElement;
-            parent.setAttribute("style", "");
-            if (!isValidMove(piece, parent.firstElementChild)) {
-                return;
-            }
-            parent.removeChild(parent.firstElementChild);
-            parent.appendChild(piece);
-            piece.setAttribute("draggable", null);
-            updateBoard(piece.getAttribute("id"), parent.getAttribute("id"));
-            checkForWin();
             return;
         }
 
@@ -206,6 +203,14 @@
         target.setAttribute("style", "background-color: ");
         piece.setAttribute("draggable", false);
         updateBoard(piece.getAttribute("id"), target.getAttribute("id"));
+
+        socket.send(
+            JSON.stringify({
+                EventType: "drop",
+                data: target.getAttribute("id")
+            })
+        );
+
         checkForWin();
     }
 
@@ -219,6 +224,12 @@
     function dragEnd() {
         dragging = false;
         draggedElement = null;
+        socket.send(
+            JSON.stringify({
+                EventType: "dragend",
+                data: null,
+            })
+        );
         clearInterval(intervalId);
     }
 
@@ -288,15 +299,11 @@
             <div class="pieces-container">
                 {#each [...pieces].reverse() as piece (piece.size)}
                     <div
-                        class="draggable"
+                        class="draggable transition-transform duration-300"
                         style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
                         size={piece.size}
                         draggable="true"
-                        id={"-1," + piece.size}
-                        on:drag={drag}
-                        on:dragstart={dragStart}
-                        on:dragend={dragEnd}
-                        on:mousedown={mouseDown}
+                        id={"opponent-" + piece.size}
                         role="gridcell"
                         tabindex="0"
                     >
@@ -331,7 +338,7 @@
                         style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
                         size={piece.size}
                         draggable="true"
-                        id={"1," + piece.size}
+                        id={"" + piece.size}
                         on:drag={drag}
                         on:dragstart={dragStart}
                         on:dragend={dragEnd}
