@@ -14,6 +14,7 @@
     let draggedElement = null;
     let numPieces = 8;
     let pieces = [];
+    let tileIds = [];
     let maxSize = 50;
     let minSize = 20;
     let dragging = false;
@@ -53,6 +54,7 @@
             switch (eventType) {
                 case "connect":
                     playerNumber = data.Id;
+                    setUpBoardData(data.Id);
                     break;
                 case "move":
                     // console.log(data);
@@ -77,19 +79,30 @@
             }
         }, 100);
 
-        document.addEventListener("dragover", (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
     });
 
-    let sizeIncrements = (maxSize - minSize) / numPieces;
-    for (let i = 1; i != numPieces + 1; i++) {
-        pieces.push({
-            size: parseInt(i * sizeIncrements) + minSize,
-        });
+    function setUpBoardData(playerNumber) {
+        // compute piece sizes
+        let sizeIncrements = (maxSize - minSize) / numPieces;
+        for (let i = 1; i != numPieces + 1; i++) {
+            pieces.push({
+                size: parseInt(i * sizeIncrements) + minSize,
+            });
+        }
+
+        // tile ids
+        for (let i = 0; i < 9; i++) {
+            tileIds.push(i);
+        }
+
+        // reverse tile ids if player 2
+        if (playerNumber % 2 == 0) {
+            console.log("reversed");
+            tileIds.reverse();
+        }
+        console.log(tileIds)
     }
-    
+
     // data: {
     //     ClientX: mouseX,
     //     ClientY: mouseY,
@@ -98,11 +111,17 @@
     // },
     function handleOpponentMouseMove(data) {
         const cursorElement = document.getElementById("cursor");
-        // console.log(data.ClientX, data.clientY);
-        // cursorElement.style.left = data.ClientX + "px";
-        // cursorElement.style.top = data.ClientY + "px";
-        cursorElement.style.transform = `translate(${data.ClientX}px, ${data.ClientY}px)`;
+        // Could be optimized. Maybe only update gameBounds if screen is resized or magnified.
+        const gameBounds = document.getElementById("game-bounds").getBoundingClientRect();
+        cursorElement.style.transform = `translate(${data.ClientX + gameBounds.x}px, ${data.ClientY + gameBounds.y}px)`;
     }
+
+    function updateMouseCoordinates(event) {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        // coords should be relative to play area and mirrored
+        mouseX = bounds.width - (event.clientX - bounds.x);
+        mouseY = bounds.height - (event.clientY - bounds.y);
+    };
 
     function dragStart(event) {
         event.dataTransfer.setData("piece", event.target.id);
@@ -260,66 +279,73 @@
     }
 </script>
 
-<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor"></div>
+<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor" />
 
 <!-- Create draggable elements -->
-<div id="container" class="w-screen bg-slate-200 gap-4 h-screen flex flex-col items-center justify-center">
-    <div class="pieces-container">
-        {#each pieces as piece (piece.size)}
-            <div
-                class="draggable"
-                style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
-                size={piece.size}
-                draggable="true"
-                id={"-1," + piece.size}
-                on:drag={drag}
-                on:dragstart={dragStart}
-                on:dragend={dragEnd}
-                on:mousedown={mouseDown}
-                role="gridcell"
-                tabindex="0"
-            >
-                <!-- {piece.size} -->
+<div id="container" class="w-screen h-screen bg-slate-200 flex items-center justify-center">
+    {#if playerNumber != null}
+        <div id="game-bounds" class="bg-black p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+            <div class="pieces-container">
+                {#each [...pieces].reverse() as piece (piece.size)}
+                    <div
+                        class="draggable"
+                        style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
+                        size={piece.size}
+                        draggable="true"
+                        id={"-1," + piece.size}
+                        on:drag={drag}
+                        on:dragstart={dragStart}
+                        on:dragend={dragEnd}
+                        on:mousedown={mouseDown}
+                        role="gridcell"
+                        tabindex="0"
+                    >
+                        <!-- {piece.size} -->
+                    </div>
+                {/each}
             </div>
-        {/each}
-    </div>
 
-    <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-    <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
-        {#each Array(9) as _, index (index)}
-            <div
-                class="cell z-10"
-                id={index}
-                on:dragleave={dragLeave}
-                on:drop={drop}
-                on:dragover={allowDrop}
-                role="gridcell"
-                draggable="false"
-                tabindex="0"
-            />
-        {/each}
-    </div>
-
-    <!-- Create draggable elements -->
-    <div class="pieces-container">
-        {#each pieces as piece (piece.size)}
-            <div
-                class="draggable"
-                style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
-                size={piece.size}
-                draggable="true"
-                id={"1," + piece.size}
-                on:drag={drag}
-                on:dragstart={dragStart}
-                on:dragend={dragEnd}
-                on:mousedown={mouseDown}
-                role="gridcell"
-                tabindex="0"
-            >
-                <!-- {piece.size} -->
+            <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
+            <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
+                {#each tileIds as id, index (index)}
+                    <div
+                        class="cell z-10"
+                        id={id}
+                        on:dragleave={dragLeave}
+                        on:drop={drop}
+                        on:dragover={allowDrop}
+                        role="gridcell"
+                        draggable="false"
+                        tabindex="0"
+                    >
+                        {id}
+                    </div>
+                {/each}
             </div>
-        {/each}
-    </div>
+
+            <!-- Create draggable elements -->
+            <div class="pieces-container">
+                {#each pieces as piece (piece.size)}
+                    <div
+                        class="draggable"
+                        style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
+                        size={piece.size}
+                        draggable="true"
+                        id={"1," + piece.size}
+                        on:drag={drag}
+                        on:dragstart={dragStart}
+                        on:dragend={dragEnd}
+                        on:mousedown={mouseDown}
+                        role="gridcell"
+                        tabindex="0"
+                    >
+                    </div>
+                {/each}
+            </div>
+        </div>
+    {:else}
+        <p>Connecting...</p>
+    {/if}
 </div>
 
 <style>
