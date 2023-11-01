@@ -18,6 +18,7 @@
     let maxSize = 50;
     let minSize = 20;
     let dragging = false;
+    let pieceDropped = true;
 
     let ogOpponentPieceCoords = null;
     let opponentDragging = false;
@@ -35,6 +36,7 @@
             socket.send(
                 JSON.stringify({
                     EventType: "connect",
+                    PlayerId: playerNumber,
                     data: null,
                 })
             );
@@ -54,7 +56,7 @@
             // console.log(received);
             const eventType = received.EventType;
             const data = received.Data;
-            console.log(eventType);
+            // console.log(eventType);
             switch (eventType) {
                 case "connect":
                     playerNumber = data.Id;
@@ -68,17 +70,18 @@
                     handleOpponentDragEnd(data);
                     break;
                 case "drop":
-                    console.log(received)
+                    // console.log(received);
                     handleOpponentDrop(data);
                     break;
             }
         };
 
         setInterval(() => {
-            if (draggedElement != null) {
+            if (!pieceDropped && draggedElement != null) {
                 socket.send(
                     JSON.stringify({
                         EventType: "move",
+                        PlayerId: playerNumber,
                         data: {
                             ClientX: mouseX,
                             ClientY: mouseY,
@@ -89,15 +92,21 @@
                 );
             }
         }, 100);
-
     });
 
     function handleOpponentDrop(data) {
-        console.log("opponent dropped");
-        console.log(data)
+        // console.log("opponent dropped");
+        if (data.isValidMove) {
+            const piece = document.getElementById("opponent-" + data.piece);
+            const cell = document.getElementById(data.cell);
+            placePieceInCell(piece, cell);
+            // console.log("placed");
+        }
     }
-    
+
     function handleOpponentDragEnd(data) {
+        const piece = document.getElementById("opponent-" + data.piece);
+        piece.style.transform = `translate(0px, 0px)`;
         opponentDragging = false;
     }
 
@@ -117,10 +126,8 @@
 
         // reverse tile ids if player 2
         if (playerNumber % 2 == 0) {
-            console.log("reversed");
             tileIds.reverse();
         }
-        console.log(tileIds)
     }
 
     function handleOpponentMouseMove(data) {
@@ -135,9 +142,10 @@
         cursorElement.style.transform = `translate(${data.ClientX + gameBounds.x}px, ${data.ClientY + gameBounds.y}px)`;
         // place relative to game area - offset original position of piece - estimate opponent's pointer coordinates in middle
         // TODO: accurately calculate pointer coordinates of opponent
-        const pieceX = (data.ClientX + gameBounds.x) - ogOpponentPieceCoords.x - (ogOpponentPieceCoords.width/2);
-        const pieceY = (data.ClientY + gameBounds.y) - ogOpponentPieceCoords.y - (ogOpponentPieceCoords.height/2);
+        const pieceX = data.ClientX + gameBounds.x - ogOpponentPieceCoords.x - ogOpponentPieceCoords.width / 2;
+        const pieceY = data.ClientY + gameBounds.y - ogOpponentPieceCoords.y - ogOpponentPieceCoords.height / 2;
         opponentPiece.style.transform = `translate(${pieceX}px, ${pieceY}px)`;
+        // console.log("moved")
     }
 
     function updateMouseCoordinates(event) {
@@ -145,18 +153,23 @@
         // coords should be relative to play area and mirrored
         mouseX = bounds.width - (event.clientX - bounds.x);
         mouseY = bounds.height - (event.clientY - bounds.y);
-    };
+    }
 
     function dragStart(event) {
+        // To remove drag ghost image
+        // let ghostImageDummy = new Image();
+        // ghostImageDummy.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=';
+        // event.dataTransfer.setDragImage(ghostImageDummy, 0, 0);
         event.dataTransfer.setData("piece", event.target.id);
-        draggedElement = event.target;
+        pieceDropped = false;
+        draggedElement = event.currentTarget;
+        draggedElement.classList.add("opacity-70");
         dragging = true;
     }
 
     function drag(event) {
-        return;
-        // mouseX = event.clientX;
-        // mouseY = event.clientY;
+        event.preventDefault()
+        console.log("dragging")
     }
 
     function allowDrop(event) {
@@ -164,16 +177,20 @@
         if (dragging && draggedElement) {
             dragging = false;
             let target = event.currentTarget;
-
+            
+            // target.classList.add("bg-amber-500")
             // check if cell is not empty
             if (target.firstElementChild != null) {
-                if (isValidMove(draggedElement, target.firstElementChild)) {
+                if (checkIfValidMove(draggedElement, target)) {
+                    console.log(target)
+                    console.log(target.firstElementChild)
                     target.setAttribute("style", "background-color: rgb(232, 255, 223)");
                     console.log("valid2");
                     return;
+                }else {
+                    target.setAttribute("style", "background-color: rgb(255, 223, 223)");
+                    console.log("invalid2");
                 }
-                target.setAttribute("style", "background-color: rgb(255, 223, 223)");
-                console.log("invalid2");
             } else {
                 target.setAttribute("style", "background-color: rgb(232, 255, 223)");
                 console.log("valid3");
@@ -183,53 +200,71 @@
 
     function drop(event) {
         event.preventDefault();
+        pieceDropped = true;
         const data = event.dataTransfer.getData("piece");
         let piece = document.getElementById(data);
         let target = event.currentTarget;
+        let isValidMove = checkIfValidMove(piece, target);
 
         if (!draggedElement) {
             return;
         }
 
-        target.setAttribute("style", "");
-        // check if cell is empty
-        if (target.firstElementChild != null) {
-            if (!isValidMove(piece, target.firstElementChild)) {
-                return;
-            }
-            target.removeChild(target.firstElementChild);
+        if (isValidMove) {
+            placePieceInCell(piece, target);
         }
-        target.appendChild(piece);
-        target.setAttribute("style", "background-color: ");
-        piece.setAttribute("draggable", false);
-        updateBoard(piece.getAttribute("id"), target.getAttribute("id"));
 
         socket.send(
             JSON.stringify({
                 EventType: "drop",
-                data: target.getAttribute("id")
+                PlayerId: playerNumber,
+                data: {
+                    cell: target.getAttribute("id"),
+                    piece: piece.getAttribute("id"),
+                    isValidMove: isValidMove,
+                },
             })
         );
 
         checkForWin();
     }
 
-    function isValidMove(piece, target) {
+    function placePieceInCell(piece, cell) {
+        // cell.setAttribute("style", "");
+        // check if cell is empty
+        if (cell.firstElementChild != null) {
+            cell.removeChild(cell.firstElementChild);
+        }
+        piece.style.transform = `translate(0px, 0px)`;
+        cell.appendChild(piece);
+        // console.log("piece placed in cell, translte 0 0")
+        cell.setAttribute("style", "background-color: ");
+        piece.setAttribute("draggable", false);
+        updateBoard(piece.getAttribute("id"), cell.getAttribute("id"));
+    }
+
+    function checkIfValidMove(piece, tile) {
+        if (tile.firstElementChild == null) {
+            return true;
+        }
         let x = parseInt(piece.getAttribute("size"));
-        let y = parseInt(target.getAttribute("size"));
-        console.log(x, y);
+        let y = parseInt(tile.firstElementChild.getAttribute("size"));
         return x > y;
     }
 
     function dragEnd() {
         dragging = false;
-        draggedElement = null;
+        draggedElement.classList.remove("opacity-70")
         socket.send(
             JSON.stringify({
                 EventType: "dragend",
-                data: null,
+                PlayerId: playerNumber,
+                data: {
+                    piece: draggedElement.getAttribute("id")
+                },
             })
         );
+        draggedElement = null;
         clearInterval(intervalId);
     }
 
@@ -254,7 +289,6 @@
         const x = Math.trunc(cellNumber / 3);
         const y = cellNumber % 3;
         board[x][y] = pieceData;
-        console.log(board);
     }
 
     // trash algo
@@ -291,15 +325,17 @@
 </script>
 
 <div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor" />
+<div class="absolute left-5 top-5">Player: {playerNumber}</div>
+<div class="absolute left-5 top-10">Room: {playerNumber}</div>
 
 <!-- Create draggable elements -->
 <div id="container" class="w-screen h-screen bg-slate-200 flex items-center justify-center">
     {#if playerNumber != null}
-        <div id="game-bounds" class="bg-black p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+        <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
             <div class="pieces-container">
                 {#each [...pieces].reverse() as piece (piece.size)}
                     <div
-                        class="draggable transition-transform duration-300"
+                        class="draggable transition-transform duration-300 z-50"
                         style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
                         size={piece.size}
                         draggable="true"
@@ -312,12 +348,21 @@
                 {/each}
             </div>
 
+            <!-- .cell {
+                display: flex;
+                border: 1px solid rgb(121, 121, 121);
+                min-height: 100px;
+                min-width: 100px;
+                align-items: center;
+                /* justify-items: center; */
+                text-align: center;
+            } -->
             <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
             <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
                 {#each tileIds as id, index (index)}
                     <div
-                        class="cell z-10"
-                        id={id}
+                        class="flex border border-gray-400 h-28 w-28 items-center text-center"
+                        {id}
                         on:dragleave={dragLeave}
                         on:drop={drop}
                         on:dragover={allowDrop}
@@ -325,7 +370,7 @@
                         draggable="false"
                         tabindex="0"
                     >
-                        {id}
+                        <!-- {id} -->
                     </div>
                 {/each}
             </div>
@@ -334,7 +379,7 @@
             <div class="pieces-container">
                 {#each pieces as piece (piece.size)}
                     <div
-                        class="draggable"
+                        class="draggable z-50"
                         style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
                         size={piece.size}
                         draggable="true"
@@ -345,8 +390,7 @@
                         on:mousedown={mouseDown}
                         role="gridcell"
                         tabindex="0"
-                    >
-                    </div>
+                    />
                 {/each}
             </div>
         </div>
@@ -356,15 +400,6 @@
 </div>
 
 <style>
-    .cell {
-        display: flex;
-        border: 1px solid rgb(121, 121, 121);
-        min-height: 100px;
-        min-width: 100px;
-        align-items: center;
-        /* justify-items: center; */
-        text-align: center;
-    }
 
     .draggable {
         /* width: 50px;
