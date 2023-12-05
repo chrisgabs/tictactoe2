@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import Board from "$lib/components/Board.svelte";
 
     let board = [
         [null, null, null],
@@ -8,8 +9,9 @@
     ];
 
     let socket = null;
-    let intervalId = null;
     let playerNumber = null;
+    let roomId = null;
+    let opponentName = null;
 
     let draggedElement = null;
     let numPieces = 8;
@@ -26,11 +28,49 @@
     let mouseX = 0;
     let mouseY = 0;
 
-    onMount(() => {
-        // document.addEventListener("mousemove", handleMouseMove)
-        socket = new WebSocket("ws://127.0.0.1:8080/ws");
-        console.log("Attempting Connection...");
+    let boardData;
 
+    onMount(() => {
+        // Retrieve session informtion from backend
+        setUpBoardData(1);
+        (async () => {
+            console.log("------- connect -------"); 
+            const response = await fetch("http://127.0.0.1:8080/connect", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                credentials: "include",
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log(data);
+                if (data.newPlayer) {
+                    socket = new WebSocket("ws://127.0.0.1:8080/ws/newPlayer");
+                    console.log("Attempting Connection... new player");
+                } else {
+                    socket = new WebSocket("ws://127.0.0.1:8080/ws/existingPlayer");
+                    console.log("Attempting Connection... existing player");
+                    if (data.gameOngoing) {
+                        // load ongoing game
+                    } else {
+                        // show new player view
+                    }
+                }
+                setupWebsocketConnection();
+            } else {
+                console.log("Error in receiving session information");
+            }
+        })();
+        let elements = document.getElementById("board");
+        console.log(elements);
+        // document.addEventListener("mousemove", handleMouseMove)
+    });
+
+    // function initializeWebSocketConnection() {}
+
+    function setupWebsocketConnection() {
         socket.onopen = () => {
             console.log("Successfully Connected");
             socket.send(
@@ -53,14 +93,17 @@
 
         socket.onmessage = (message) => {
             const received = JSON.parse(message.data);
-            // console.log(received);
+            console.log("WS received: --");
+            console.log(received);
             const eventType = received.EventType;
             const data = received.Data;
             // console.log(eventType);
             switch (eventType) {
                 case "connect":
-                    playerNumber = data.Id;
-                    setUpBoardData(data.Id);
+                    playerNumber = data.playerNumber;
+                    roomId = data.roomId;
+                    boardData = data.boardData;
+                    // setUpBoardDataAfterJoining(data.playerNumber, data.boardData);
                     break;
                 case "move":
                     // console.log(data);
@@ -92,7 +135,7 @@
                 );
             }
         }, 100);
-    });
+    }
 
     function handleOpponentDrop(data) {
         // console.log("opponent dropped");
@@ -127,6 +170,37 @@
         // reverse tile ids if player 2
         if (playerNumber % 2 == 0) {
             tileIds.reverse();
+        }
+    }
+
+    function setUpBoardDataAfterJoining(playerNumber, boardData) {
+        console.log("board data:");
+        // update board cell ids
+        let elements = document.getElementById("board").children;
+        console.log(elements);
+        for (let i = 0; i < elements.length; i++) {
+            // console.log(elements[i])
+            if (playerNumber == 1) {
+                elements[i].id = i;
+            } else {
+                elements[i].id = elements.length - 1 - i;
+            }
+        }
+
+        // place pieces in board
+        for (let i in boardData) {
+            const piece = boardData[i].split(",");
+            let pieceId = "";
+            if (piece[0] === "0") {
+                continue;
+            } else if (piece[0] == playerNumber) {
+                pieceId = piece[1];
+            } else {
+                pieceId = "opponent-" + piece[1];
+            }
+            const pieceElement = document.getElementById(pieceId);
+            const cellElement = document.getElementById(i);
+            placePieceInCell(pieceElement, cellElement);
         }
     }
 
@@ -168,26 +242,24 @@
     }
 
     function drag(event) {
-        event.preventDefault()
-        console.log("dragging")
+        event.preventDefault();
     }
 
-    function allowDrop(event) {
+    function dragOverHandler(event) {
         event.preventDefault();
         if (dragging && draggedElement) {
+            console.log("dragger");
             dragging = false;
             let target = event.currentTarget;
-            
+
             // target.classList.add("bg-amber-500")
             // check if cell is not empty
             if (target.firstElementChild != null) {
                 if (checkIfValidMove(draggedElement, target)) {
-                    console.log(target)
-                    console.log(target.firstElementChild)
                     target.setAttribute("style", "background-color: rgb(232, 255, 223)");
                     console.log("valid2");
                     return;
-                }else {
+                } else {
                     target.setAttribute("style", "background-color: rgb(255, 223, 223)");
                     console.log("invalid2");
                 }
@@ -203,15 +275,17 @@
         pieceDropped = true;
         const data = event.dataTransfer.getData("piece");
         let piece = document.getElementById(data);
-        let target = event.currentTarget;
-        let isValidMove = checkIfValidMove(piece, target);
+        let cell = event.currentTarget;
+        let isValidMove = checkIfValidMove(piece, cell);
+        cell.setAttribute("style", "background-color: ");
+        
 
         if (!draggedElement) {
             return;
         }
 
         if (isValidMove) {
-            placePieceInCell(piece, target);
+            placePieceInCell(piece, cell);
         }
 
         socket.send(
@@ -219,7 +293,8 @@
                 EventType: "drop",
                 PlayerId: playerNumber,
                 data: {
-                    cell: target.getAttribute("id"),
+                    playerNumber: playerNumber,
+                    cell: cell.getAttribute("id"),
                     piece: piece.getAttribute("id"),
                     isValidMove: isValidMove,
                 },
@@ -254,18 +329,17 @@
 
     function dragEnd() {
         dragging = false;
-        draggedElement.classList.remove("opacity-70")
+        draggedElement.classList.remove("opacity-70");
         socket.send(
             JSON.stringify({
                 EventType: "dragend",
                 PlayerId: playerNumber,
                 data: {
-                    piece: draggedElement.getAttribute("id")
+                    piece: draggedElement.getAttribute("id"),
                 },
             })
         );
         draggedElement = null;
-        clearInterval(intervalId);
     }
 
     function dragLeave(event) {
@@ -322,14 +396,48 @@
         }
         return false;
     }
+
+    async function joinRoom() {
+        const roomInput = document.getElementById("room-input");
+        console.log("-- Joining room: " + roomInput.value);
+        const response = await fetch("http://127.0.0.1:8080/join", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+                RoomId: roomInput.value,
+            }),
+        });
+        if (response.ok) {
+            console.log("successfully joined room: " + roomInput.value);
+            const data = await response.json();
+            roomId = roomInput.value;
+            opponentName = data.opponentDisplayName;
+            playerNumber = data.playerNumber;
+            setUpBoardDataAfterJoining(playerNumber, data.data);
+            console.log(data);
+        } else {
+            console.log("ERROR could not join room: " + roomInput.value);
+        }
+    }
 </script>
 
 <div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor" />
 <div class="absolute left-5 top-5">Player: {playerNumber}</div>
-<div class="absolute left-5 top-10">Room: {playerNumber}</div>
+<div class="absolute left-5 top-10">Opponent: {opponentName}</div>
+<div class="absolute left-5 top-20">Room: {roomId}</div>
 
-<!-- Create draggable elements -->
-<div id="container" class="w-screen h-screen bg-slate-200 flex items-center justify-center">
+<div id="container" class="w-screen h-screen bg-slate-200 flex flex-col items-center justify-center">
+    <p>Your Room Number: {roomId}</p>
+
+    <div class="flex space-x-2">
+        <input id="room-input" type="text" class="w-full p-2 border border-gray-300 rounded" placeholder="Enter text..." />
+        <button class="p-2 bg-blue-500 text-white rounded" on:click={joinRoom}>Submit</button>
+    </div>
+
+    <!-- Create draggable elements -->
     {#if playerNumber != null}
         <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
             <div class="pieces-container">
@@ -358,22 +466,32 @@
                 text-align: center;
             } -->
             <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-            <div class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
+            {#if boardData != null}
+                <Board
+                    {board}
+                    {playerNumber}
+                    {boardData}
+                    {tileIds}
+                    dragLeaveHandler={dragLeave}
+                    dropHandler={drop}
+                    dragoverHandler={dragOverHandler}
+                />
+            {/if}
+            <!-- <div id="board" class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
                 {#each tileIds as id, index (index)}
                     <div
                         class="flex border border-gray-400 h-28 w-28 items-center text-center"
                         {id}
                         on:dragleave={dragLeave}
                         on:drop={drop}
-                        on:dragover={allowDrop}
+                        on:dragover={dragOverHandler}
                         role="gridcell"
                         draggable="false"
                         tabindex="0"
                     >
-                        <!-- {id} -->
                     </div>
                 {/each}
-            </div>
+            </div> -->
 
             <!-- Create draggable elements -->
             <div class="pieces-container">
@@ -400,7 +518,6 @@
 </div>
 
 <style>
-
     .draggable {
         /* width: 50px;
         height: 50px; */
@@ -420,13 +537,5 @@
         /* border: 1px solid rgb(167, 167, 167); */
         border-radius: 3px;
         padding: 3px;
-    }
-
-    .valid-cell {
-        background-color: rgb(232, 255, 223);
-    }
-
-    .invalid-cell {
-        background-color: rgb(255, 223, 223);
     }
 </style>
