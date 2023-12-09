@@ -1,6 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import Board from "$lib/components/Board.svelte";
+    import { API_BASE_URL, API_BASE_PORT } from "$lib/config/constants";
 
     let board = [
         [null, null, null],
@@ -8,6 +9,9 @@
         [null, null, null],
     ];
 
+    const SERVER_ADDRESS = API_BASE_URL + ":" + API_BASE_PORT;
+
+    let gameResets = 0
     let socket = null;
     let playerNumber = null;
     let roomId = null;
@@ -34,8 +38,9 @@
         // Retrieve session informtion from backend
         setUpBoardData(1);
         (async () => {
-            console.log("------- connect -------"); 
-            const response = await fetch("http://127.0.0.1:8080/connect", {
+            console.log("------- connect -------");
+            const response = await fetch("https://" + SERVER_ADDRESS + "/connect", {
+                // const response = await fetch("http://" + "192.168.19.7:8080" + "/connect", {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -47,10 +52,10 @@
                 const data = await response.json();
                 console.log(data);
                 if (data.newPlayer) {
-                    socket = new WebSocket("ws://127.0.0.1:8080/ws/newPlayer");
+                    socket = new WebSocket("wss://" + SERVER_ADDRESS + "/ws/newPlayer");
                     console.log("Attempting Connection... new player");
                 } else {
-                    socket = new WebSocket("ws://127.0.0.1:8080/ws/existingPlayer");
+                    socket = new WebSocket("wss://" + SERVER_ADDRESS + "/ws/existingPlayer");
                     console.log("Attempting Connection... existing player");
                     if (data.gameOngoing) {
                         // load ongoing game
@@ -116,6 +121,15 @@
                     // console.log(received);
                     handleOpponentDrop(data);
                     break;
+                case "join":
+                    handleOpponentJoin(data);
+                    break;
+                case "reset":
+                    handleGameReset(data);
+                    break;
+                case "leave":
+                    handleGameReset(data);
+                    break;
             }
         };
 
@@ -135,6 +149,16 @@
                 );
             }
         }, 100);
+    }
+
+    function handleGameReset(data) {
+        gameResets += 1;
+        console.log("Game is reset by" + data.DisplayName);
+    }
+
+    function handleOpponentJoin(data) {
+        opponentName = data.opponentDisplayName;
+        return;
     }
 
     function handleOpponentDrop(data) {
@@ -278,7 +302,6 @@
         let cell = event.currentTarget;
         let isValidMove = checkIfValidMove(piece, cell);
         cell.setAttribute("style", "background-color: ");
-        
 
         if (!draggedElement) {
             return;
@@ -400,7 +423,7 @@
     async function joinRoom() {
         const roomInput = document.getElementById("room-input");
         console.log("-- Joining room: " + roomInput.value);
-        const response = await fetch("http://127.0.0.1:8080/join", {
+        const response = await fetch("https://" + SERVER_ADDRESS + "/join", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -422,6 +445,45 @@
             console.log("ERROR could not join room: " + roomInput.value);
         }
     }
+
+    function resetGame() {
+        socket.send(
+            JSON.stringify({
+                EventType: "reset",
+                PlayerId: playerNumber,
+                data: null,
+            })
+        );
+    }
+
+    async function leaveRoom() {
+        socket.send(
+            JSON.stringify({
+                EventType: "leave",
+                PlayerId: playerNumber,
+                data: null,
+            })
+        );
+        const response = await fetch("https://" + SERVER_ADDRESS + "/leave", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: null,
+        });
+        if (response.ok) {
+            console.log("successfully left room: " + roomId);
+            const data = await response.json();
+            gameResets += 1;
+            opponentName = null;
+            playerNumber = data.playerNumber;
+            roomId = data.roomId;
+            console.log(data);
+        } else {
+            console.log("ERROR could not reassign new room");
+        }
+    }
 </script>
 
 <div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor" />
@@ -435,86 +497,66 @@
     <div class="flex space-x-2">
         <input id="room-input" type="text" class="w-full p-2 border border-gray-300 rounded" placeholder="Enter text..." />
         <button class="p-2 bg-blue-500 text-white rounded" on:click={joinRoom}>Submit</button>
+        <button class="p-2 bg-blue-500 text-white rounded" on:click={resetGame}>New Game</button>
+        <button class="p-2 bg-blue-500 text-white rounded" on:click={leaveRoom}>Leave Room</button>
     </div>
 
-    <!-- Create draggable elements -->
-    {#if playerNumber != null}
-        <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
-            <div class="pieces-container">
-                {#each [...pieces].reverse() as piece (piece.size)}
-                    <div
-                        class="draggable transition-transform duration-300 z-50"
-                        style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
-                        size={piece.size}
-                        draggable="true"
-                        id={"opponent-" + piece.size}
-                        role="gridcell"
-                        tabindex="0"
-                    >
-                        <!-- {piece.size} -->
-                    </div>
-                {/each}
-            </div>
+    {#key gameResets}
+        <!-- Create draggable elements -->
+        {#if playerNumber != null}
+            <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+                <div class="pieces-container">
+                    {#each [...pieces].reverse() as piece (piece.size)}
+                        <div
+                            class="draggable transition-transform duration-300 z-50"
+                            style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
+                            size={piece.size}
+                            draggable="true"
+                            id={"opponent-" + piece.size}
+                            role="gridcell"
+                            tabindex="0"
+                        >
+                            <!-- {piece.size} -->
+                        </div>
+                    {/each}
+                </div>
 
-            <!-- .cell {
-                display: flex;
-                border: 1px solid rgb(121, 121, 121);
-                min-height: 100px;
-                min-width: 100px;
-                align-items: center;
-                /* justify-items: center; */
-                text-align: center;
-            } -->
-            <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-            {#if boardData != null}
-                <Board
-                    {board}
-                    {playerNumber}
-                    {boardData}
-                    {tileIds}
-                    dragLeaveHandler={dragLeave}
-                    dropHandler={drop}
-                    dragoverHandler={dragOverHandler}
-                />
-            {/if}
-            <!-- <div id="board" class="grid grid-cols-3 gap-1 bg-white p-1 rounded-lg shadow-lg">
-                {#each tileIds as id, index (index)}
-                    <div
-                        class="flex border border-gray-400 h-28 w-28 items-center text-center"
-                        {id}
-                        on:dragleave={dragLeave}
-                        on:drop={drop}
-                        on:dragover={dragOverHandler}
-                        role="gridcell"
-                        draggable="false"
-                        tabindex="0"
-                    >
-                    </div>
-                {/each}
-            </div> -->
-
-            <!-- Create draggable elements -->
-            <div class="pieces-container">
-                {#each pieces as piece (piece.size)}
-                    <div
-                        class="draggable z-50"
-                        style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
-                        size={piece.size}
-                        draggable="true"
-                        id={"" + piece.size}
-                        on:drag={drag}
-                        on:dragstart={dragStart}
-                        on:dragend={dragEnd}
-                        on:mousedown={mouseDown}
-                        role="gridcell"
-                        tabindex="0"
+                <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
+                {#if boardData != null}
+                    <Board
+                        {board}
+                        {playerNumber}
+                        {boardData}
+                        {tileIds}
+                        dragLeaveHandler={dragLeave}
+                        dropHandler={drop}
+                        dragoverHandler={dragOverHandler}
                     />
-                {/each}
+                {/if}
+
+                <!-- Create draggable elements -->
+                <div class="pieces-container">
+                    {#each pieces as piece (piece.size)}
+                        <div
+                            class="draggable z-50"
+                            style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
+                            size={piece.size}
+                            draggable="true"
+                            id={"" + piece.size}
+                            on:drag={drag}
+                            on:dragstart={dragStart}
+                            on:dragend={dragEnd}
+                            on:mousedown={mouseDown}
+                            role="gridcell"
+                            tabindex="0"
+                        />
+                    {/each}
+                </div>
             </div>
-        </div>
-    {:else}
-        <p>Connecting...</p>
-    {/if}
+        {:else}
+            <p>Connecting...</p>
+        {/if}
+    {/key}
 </div>
 
 <style>
