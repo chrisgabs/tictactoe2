@@ -128,7 +128,11 @@
                     handleGameReset(data);
                     break;
                 case "leave":
+                    opponentName = null;
                     handleGameReset(data);
+                    break;
+                case "win":
+                    handleWin(data);
                     break;
             }
         };
@@ -149,6 +153,11 @@
                 );
             }
         }, 100);
+    }
+
+    function handleWin(data) {
+        alert(data.winner + " won");
+        gameResets += 1;
     }
 
     function handleGameReset(data) {
