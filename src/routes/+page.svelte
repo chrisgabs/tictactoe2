@@ -11,11 +11,12 @@
 
     const SERVER_ADDRESS = API_BASE_URL + ":" + API_BASE_PORT;
 
-    let gameResets = 0
+    let gameResets = 0;
     let socket = null;
     let playerNumber = null;
     let roomId = null;
     let opponentName = null;
+    let playerWithTurn = 1;
 
     let draggedElement = null;
     let numPieces = 8;
@@ -108,6 +109,9 @@
                     playerNumber = data.playerNumber;
                     roomId = data.roomId;
                     boardData = data.boardData;
+                    playerWithTurn = data.playerWithTurn; 
+                    opponentName = data.opponentDisplayName;
+                    console.log(data)
                     // setUpBoardDataAfterJoining(data.playerNumber, data.boardData);
                     break;
                 case "move":
@@ -129,10 +133,14 @@
                     break;
                 case "leave":
                     opponentName = null;
-                    handleGameReset(data);
+                    playerWithTurn = playerNumber;
+                    gameResets += 1;
                     break;
                 case "win":
                     handleWin(data);
+                    break;
+                case "game_start":
+                    handleGameStart(data);
                     break;
             }
         };
@@ -155,14 +163,30 @@
         }, 100);
     }
 
-    function handleWin(data) {
-        alert(data.winner + " won");
+    function handleGameStart(data) {
+        console.log("Game has started player with turn: " + data.playerWithTurn);
+        playerWithTurn = data.playerWithTurn;
         gameResets += 1;
+    }
+
+    function handleWin(data) {
+        prompt = data.winner + " won, would you like to start a new game?";
+        if (confirm(prompt) == true) {
+            socket.send(
+                JSON.stringify({
+                    EventType: "ready",
+                    PlayerId: playerNumber,
+                    data: null,
+                })
+            );
+        }
     }
 
     function handleGameReset(data) {
         gameResets += 1;
-        console.log("Game is reset by" + data.DisplayName);
+        console.log("Game is reset by " + data.displayName);
+        console.log(playerWithTurn);
+        playerWithTurn = data.playerWithTurn
     }
 
     function handleOpponentJoin(data) {
@@ -172,6 +196,7 @@
 
     function handleOpponentDrop(data) {
         // console.log("opponent dropped");
+        playerWithTurn = playerNumber == 1 ? 1 : 2;
         if (data.isValidMove) {
             const piece = document.getElementById("opponent-" + data.piece);
             const cell = document.getElementById(data.cell);
@@ -333,7 +358,8 @@
             })
         );
 
-        checkForWin();
+        playerWithTurn = playerNumber == 1 ? 2 : 1;
+        // checkForWin();
     }
 
     function placePieceInCell(piece, cell) {
@@ -488,6 +514,7 @@
             opponentName = null;
             playerNumber = data.playerNumber;
             roomId = data.roomId;
+            playerWithTurn = playerNumber;
             console.log(data);
         } else {
             console.log("ERROR could not reassign new room");
@@ -550,7 +577,7 @@
                             class="draggable z-50"
                             style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
                             size={piece.size}
-                            draggable="true"
+                            draggable={playerWithTurn == playerNumber}
                             id={"" + piece.size}
                             on:drag={drag}
                             on:dragstart={dragStart}
@@ -562,6 +589,11 @@
                     {/each}
                 </div>
             </div>
+            {#if playerWithTurn == playerNumber}
+                <p>Your turn to move</p>
+            {:else}
+                <p>{opponentName}'s turn to move</p>
+            {/if}
         {:else}
             <p>Connecting...</p>
         {/if}
