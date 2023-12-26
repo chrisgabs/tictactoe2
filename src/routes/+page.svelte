@@ -1,6 +1,10 @@
 <script>
     import { onMount } from "svelte";
     import Board from "$lib/components/Board.svelte";
+    import Board2 from "$lib/components/Board2.svelte";
+    import PiecesContainer from "$lib/components/PiecesContainer.svelte";
+    import PiecesContainerOpponent from "$lib/components/PiecesContainerOpponent.svelte";
+    import Console from "$lib/components/Console.svelte";
     import { API_BASE_URL } from "$lib/config/constants";
 
     let board = [
@@ -17,6 +21,7 @@
     let roomId = null;
     let opponentName = null;
     let playerWithTurn = 1;
+    let displayName = null;
 
     let draggedElement = null;
     let numPieces = 8;
@@ -52,6 +57,7 @@
             if (response.ok) {
                 const data = await response.json();
                 console.log(data);
+                displayName = data.displayName;
                 if (data.newPlayer) {
                     socket = new WebSocket("wss://" + SERVER_ADDRESS + "/ws/newPlayer");
                     console.log("Attempting Connection... new player");
@@ -109,9 +115,9 @@
                     playerNumber = data.playerNumber;
                     roomId = data.roomId;
                     boardData = data.boardData;
-                    playerWithTurn = data.playerWithTurn; 
+                    playerWithTurn = data.playerWithTurn;
                     opponentName = data.opponentDisplayName;
-                    console.log(data)
+                    console.log(data);
                     // setUpBoardDataAfterJoining(data.playerNumber, data.boardData);
                     break;
                 case "move":
@@ -186,7 +192,7 @@
         gameResets += 1;
         console.log("Game is reset by " + data.displayName);
         console.log(playerWithTurn);
-        playerWithTurn = data.playerWithTurn
+        playerWithTurn = data.playerWithTurn;
     }
 
     function handleOpponentJoin(data) {
@@ -527,98 +533,55 @@
 <div class="absolute left-5 top-10">Opponent: {opponentName}</div>
 <div class="absolute left-5 top-20">Room: {roomId}</div>
 
-<div id="container" class="w-screen h-screen bg-slate-200 flex flex-col items-center justify-center">
-    <p>Your Room Number: {roomId}</p>
-
-    <div class="flex space-x-2">
-        <input id="room-input" type="text" class="w-full p-2 border border-gray-300 rounded" placeholder="Enter text..." />
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={joinRoom}>Submit</button>
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={resetGame}>New Game</button>
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={leaveRoom}>Leave Room</button>
+<div id="container" class="w-screen h-screen flex flex-col items-center justify-center">
+    <div class="flex flex-col gap-2 justify-center align-middle text-center">
+        <p>Your Room Number: {roomId}</p>
+        <div class="flex space-x-2">
+            <input id="room-input" type="text" placeholder="Enter Room Number" class="input input-bordered w-full max-w-xs" />
+            <button class="p-2 btn btn-outline" on:click={joinRoom}>Join Room</button>
+        </div>
     </div>
 
-    {#key gameResets}
-        <!-- Create draggable elements -->
-        {#if playerNumber != null}
-            <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
-                <div class="pieces-container">
-                    {#each [...pieces].reverse() as piece (piece.size)}
-                        <div
-                            class="draggable transition-transform duration-300 z-50"
-                            style="width: {piece.size}px; height: {piece.size}px; background-color: #ff9d87"
-                            size={piece.size}
-                            draggable="true"
-                            id={"opponent-" + piece.size}
-                            role="gridcell"
-                            tabindex="0"
-                        >
-                            <!-- {piece.size} -->
-                        </div>
-                    {/each}
-                </div>
+    <div class="flex flex-col sm:flex-row gap-4">
+        {#key gameResets}
+            <!-- Create draggable elements -->
+            {#if playerNumber != null}
+                <div class="text-center">
+                    <div id="game-bounds" class=" pt-6 pb-1 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+                        <PiecesContainerOpponent {pieces} />
 
-                <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-                {#if boardData != null}
-                    <Board
-                        {board}
-                        {playerNumber}
-                        {boardData}
-                        {tileIds}
-                        dragLeaveHandler={dragLeave}
-                        dropHandler={drop}
-                        dragoverHandler={dragOverHandler}
-                    />
-                {/if}
+                        <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
+                        {#if boardData != null}
+                            <Board2
+                                {playerNumber}
+                                {boardData}
+                                {tileIds}
+                                dragLeaveHandler={dragLeave}
+                                dropHandler={drop}
+                                dragoverHandler={dragOverHandler}
+                            />
+                        {/if}
 
-                <!-- Create draggable elements -->
-                <div class="pieces-container">
-                    {#each pieces as piece (piece.size)}
-                        <div
-                            class="draggable z-50"
-                            style="width: {piece.size}px; height: {piece.size}px; background-color: #8793ff"
-                            size={piece.size}
-                            draggable={playerWithTurn == playerNumber}
-                            id={"" + piece.size}
-                            on:drag={drag}
-                            on:dragstart={dragStart}
-                            on:dragend={dragEnd}
-                            on:mousedown={mouseDown}
-                            role="gridcell"
-                            tabindex="0"
-                        />
-                    {/each}
+                        <!-- Create draggable elements -->
+                        <PiecesContainer {pieces} {playerWithTurn} {playerNumber} {drag} {dragStart} {dragEnd} {mouseDown} />
+                    </div>
+                    <!-- your turn prompt -->
+                    {#if playerWithTurn == playerNumber}
+                        <p>Your turn to move</p>
+                    {:else}
+                        <p>{opponentName}'s turn to move</p>
+                    {/if}
                 </div>
-            </div>
-            {#if playerWithTurn == playerNumber}
-                <p>Your turn to move</p>
             {:else}
-                <p>{opponentName}'s turn to move</p>
+                <p>Connecting...</p>
             {/if}
-        {:else}
-            <p>Connecting...</p>
-        {/if}
-    {/key}
+
+            <Console
+                {resetGame}
+                {leaveRoom}
+                {displayName}
+                {opponentName}
+            />
+        {/key}
+    </div>
 </div>
-
-<style>
-    .draggable {
-        /* width: 50px;
-        height: 50px; */
-        /* background-color: #ff9d87; */
-        /* background-color: #8793ff; */
-        color: #fff;
-        text-align: center;
-        line-height: 50px;
-        cursor: move;
-        margin: auto;
-        border-radius: 6%;
-    }
-
-    .pieces-container {
-        display: flex;
-        gap: 6px;
-        /* border: 1px solid rgb(167, 167, 167); */
-        border-radius: 3px;
-        padding: 3px;
-    }
-</style>
