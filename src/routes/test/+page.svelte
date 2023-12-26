@@ -4,6 +4,7 @@
     import Board2 from "$lib/components/Board2.svelte";
     import PiecesContainer from "$lib/components/PiecesContainer.svelte";
     import PiecesContainerOpponent from "$lib/components/PiecesContainerOpponent.svelte";
+    import Console from "$lib/components/Console.svelte";
     import { API_BASE_URL } from "$lib/config/constants";
 
     let board = [
@@ -20,6 +21,7 @@
     let roomId = null;
     let opponentName = null;
     let playerWithTurn = 1;
+    let displayName = null;
 
     let draggedElement = null;
     let numPieces = 8;
@@ -55,6 +57,7 @@
             if (response.ok) {
                 const data = await response.json();
                 console.log(data);
+                displayName = data.displayName;
                 if (data.newPlayer) {
                     socket = new WebSocket("wss://" + SERVER_ADDRESS + "/ws/newPlayer");
                     console.log("Attempting Connection... new player");
@@ -112,9 +115,9 @@
                     playerNumber = data.playerNumber;
                     roomId = data.roomId;
                     boardData = data.boardData;
-                    playerWithTurn = data.playerWithTurn; 
+                    playerWithTurn = data.playerWithTurn;
                     opponentName = data.opponentDisplayName;
-                    console.log(data)
+                    console.log(data);
                     // setUpBoardDataAfterJoining(data.playerNumber, data.boardData);
                     break;
                 case "move":
@@ -189,7 +192,7 @@
         gameResets += 1;
         console.log("Game is reset by " + data.displayName);
         console.log(playerWithTurn);
-        playerWithTurn = data.playerWithTurn
+        playerWithTurn = data.playerWithTurn;
     }
 
     function handleOpponentJoin(data) {
@@ -531,54 +534,54 @@
 <div class="absolute left-5 top-20">Room: {roomId}</div>
 
 <div id="container" class="w-screen h-screen flex flex-col items-center justify-center">
-    <p>Your Room Number: {roomId}</p>
-
-    <div class="flex space-x-2">
-        <input id="room-input" type="text" class="w-full p-2 border border-gray-300 rounded" placeholder="Enter text..." />
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={joinRoom}>Submit</button>
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={resetGame}>New Game</button>
-        <button class="p-2 bg-blue-500 text-white rounded" on:click={leaveRoom}>Leave Room</button>
+    <div class="flex flex-col gap-2 justify-center align-middle text-center">
+        <p>Your Room Number: {roomId}</p>
+        <div class="flex space-x-2">
+            <input id="room-input" type="text" placeholder="Enter Room Number" class="input input-bordered w-full max-w-xs" />
+            <button class="p-2 btn btn-outline" on:click={joinRoom}>Join Room</button>
+        </div>
     </div>
 
-    {#key gameResets}
-        <!-- Create draggable elements -->
-        {#if playerNumber != null}
-            <div id="game-bounds" class=" p-6 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
-                <PiecesContainerOpponent
-                    {pieces}
-                />
+    <div class="flex flex-col sm:flex-row gap-4">
+        {#key gameResets}
+            <!-- Create draggable elements -->
+            {#if playerNumber != null}
+                <div class="text-center">
+                    <div id="game-bounds" class=" pt-6 pb-1 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+                        <PiecesContainerOpponent {pieces} />
 
-                <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-                {#if boardData != null}
-                    <Board2
-                        {playerNumber}
-                        {boardData}
-                        {tileIds}
-                        dragLeaveHandler={dragLeave}
-                        dropHandler={drop}
-                        dragoverHandler={dragOverHandler}
-                    />
-                {/if}
+                        <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
+                        {#if boardData != null}
+                            <Board2
+                                {playerNumber}
+                                {boardData}
+                                {tileIds}
+                                dragLeaveHandler={dragLeave}
+                                dropHandler={drop}
+                                dragoverHandler={dragOverHandler}
+                            />
+                        {/if}
 
-                <!-- Create draggable elements -->
-                <PiecesContainer
-                    {pieces}
-                    {playerWithTurn}
-                    {playerNumber}
-                    {drag}
-                    {dragStart}
-                    {dragEnd}
-                    {mouseDown}
-                />
-
-            </div>
-            {#if playerWithTurn == playerNumber}
-                <p>Your turn to move</p>
+                        <!-- Create draggable elements -->
+                        <PiecesContainer {pieces} {playerWithTurn} {playerNumber} {drag} {dragStart} {dragEnd} {mouseDown} />
+                    </div>
+                    <!-- your turn prompt -->
+                    {#if playerWithTurn == playerNumber}
+                        <p>Your turn to move</p>
+                    {:else}
+                        <p>{opponentName}'s turn to move</p>
+                    {/if}
+                </div>
             {:else}
-                <p>{opponentName}'s turn to move</p>
+                <p>Connecting...</p>
             {/if}
-        {:else}
-            <p>Connecting...</p>
-        {/if}
-    {/key}
+
+            <Console
+                {resetGame}
+                {leaveRoom}
+                {displayName}
+                {opponentName}
+            />
+        {/key}
+    </div>
 </div>

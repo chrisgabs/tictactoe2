@@ -1,28 +1,42 @@
-<div class="flex flex-col gap-4">
-    <button
-        class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-full"
-        >New game</button
-    >
-    <div class="flex items-center justify-between">
-        <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full"></span>
-        <div class="text-center">
-            <h2 class="font-bold">Player 1</h2>
-            <div
-                class="inline-flex items-center rounded-full border px-2.5 py-0.5 w-fit text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80"
-            >
-                2 Wins
+<script>
+    export let resetGame;
+    export let leaveRoom;
+    export let opponentName;
+    export let displayName;
+</script>
+
+<div class="flex flex-col sm:py-24 gap-1 sm:justify-between mx-auto">
+    <div class="flex justify-evenly sm:justify-start sm:flex-col gap-1 mb-1">
+        <button on:click={resetGame} class="btn btn-outline btn-sm mb-3 hidden sm:block">New game</button>
+
+        <div class="flex items-center justify-between gap-2">
+            <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-300"></span>
+            <div class="text-center">
+                <h2 class="font-bold">{displayName}</h2>
+                <div class="text-sm">1 Wins</div>
             </div>
         </div>
-    </div>
-    <div class="flex items-center justify-between">
-        <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full"></span>
-        <div class="text-center">
-            <h2 class="font-bold">Player 2</h2>
-            <div
-                class="inline-flex items-center rounded-full border px-2.5 py-0.5 w-fit text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80"
-            >
-                1 Win
+
+        {#if opponentName}
+            <div class="flex items-center justify-between gap-2">
+                <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-300"></span>
+                <div class="text-center">
+                    <h2 class="font-bold">{opponentName}</h2>
+                    <div class="text-sm">1 Win</div>
+                </div>
             </div>
-        </div>
+        {:else}
+            <div class="flex items-center justify-between gap-2">
+                <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-300"></span>
+                <div class="text-center">
+                    <h2 class="font-bold">----</h2>
+                    <div class="text-sm">----</div>
+                </div>
+            </div>
+        {/if}
+
     </div>
+
+    <button on:click={resetGame} class="btn btn-outline btn-sm w-56  sm:w-12 sm:hidden">New game</button>
+    <button on:click={leaveRoom} class="btn btn-outline btn-error w-56 sm:w-min whitespace-nowrap btn-sm">Leave Game</button>
 </div>
