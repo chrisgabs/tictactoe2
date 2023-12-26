@@ -1,7 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import Board from "$lib/components/Board.svelte";
-    import { API_BASE_URL, API_BASE_PORT } from "$lib/config/constants";
+    import { API_BASE_URL } from "$lib/config/constants";
 
     let board = [
         [null, null, null],
@@ -9,7 +9,7 @@
         [null, null, null],
     ];
 
-    const SERVER_ADDRESS = API_BASE_URL + ":" + API_BASE_PORT;
+    const SERVER_ADDRESS = API_BASE_URL;
 
     let gameResets = 0;
     let socket = null;
