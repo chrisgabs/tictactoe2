@@ -167,6 +167,20 @@
                 );
             }
         }, 100);
+
+        // to prevent cloudflare from disconnecting ws
+        // send every 95 seconds
+        setInterval(() => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                    JSON.stringify({
+                        EventType: "keepAlive",
+                        PlayerId: playerNumber,
+                        data: null,
+                    })
+                );
+            }
+        }, 95000);
     }
 
     function handleGameStart(data) {
@@ -202,8 +216,8 @@
 
     function handleOpponentDrop(data) {
         // console.log("opponent dropped");
-        playerWithTurn = playerNumber == 1 ? 1 : 2;
         if (data.isValidMove) {
+            playerWithTurn = playerNumber == 1 ? 1 : 2;
             const piece = document.getElementById("opponent-" + data.piece);
             const cell = document.getElementById(data.cell);
             placePieceInCell(piece, cell);
@@ -349,6 +363,7 @@
 
         if (isValidMove) {
             placePieceInCell(piece, cell);
+            playerWithTurn = playerNumber == 1 ? 2 : 1;
         }
 
         socket.send(
@@ -364,7 +379,6 @@
             })
         );
 
-        playerWithTurn = playerNumber == 1 ? 2 : 1;
         // checkForWin();
     }
 
