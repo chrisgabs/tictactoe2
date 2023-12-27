@@ -5,7 +5,7 @@
 <div class="pieces-container flex items-center justify-center gap-1 p-1">
     {#each [...pieces].reverse() as piece (piece.size)}
         <div
-            class="draggable transition-transform duration-300 z-50 indicator"
+            class="draggable transition-transform duration-300 z-40 indicator"
             style="width: {piece.size}px; height: {piece.size}px;"
             size={piece.size}
             draggable="true"

@@ -1,6 +1,5 @@
 <script>
     import { onMount } from "svelte";
-    import Board from "$lib/components/Board.svelte";
     import Board2 from "$lib/components/Board2.svelte";
     import PiecesContainer from "$lib/components/PiecesContainer.svelte";
     import PiecesContainerOpponent from "$lib/components/PiecesContainerOpponent.svelte";
@@ -23,6 +22,8 @@
     let opponentName = null;
     let playerWithTurn = 1;
     let displayName = null;
+    let showWinScreen = false;
+    let winMessage = null;
 
     let draggedElement = null;
     let numPieces = 8;
@@ -186,16 +187,17 @@
     }
 
     function handleWin(data) {
-        prompt = data.winner + " won, would you like to start a new game?";
-        if (confirm(prompt) == true) {
-            socket.send(
-                JSON.stringify({
-                    EventType: "ready",
-                    PlayerId: playerNumber,
-                    data: null,
-                })
-            );
+        if (data.winner === opponentName) {
+            winMessage = "Opponent has won, play again?";
+        }else {
+            winMessage = "You won, play again?";
         }
+
+        // prompt = data.winner + " won, would you like to start a new game?";
+        // winnerName
+        // set z value of pieeces to 0
+        console.log(data)
+        showWinScreen = true;
     }
 
     function handleGameReset(data) {
@@ -543,6 +545,21 @@
             console.log("ERROR could not reassign new room");
         }
     }
+
+    function playAgain() {
+        socket.send(
+            JSON.stringify({
+                EventType: "ready",
+                PlayerId: playerNumber,
+                data: null,
+            })
+        );
+        showWinScreen = false;
+    }
+
+    function closeWinScreen() {
+        showWinScreen = false;
+    }
 </script>
 
 <div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300 hidden" id="cursor" />
@@ -566,23 +583,78 @@
             <!-- Create draggable elements -->
             {#if playerNumber != null}
                 <div class="text-center">
-                    <div id="game-bounds" class=" pt-6 pb-1 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
-                        <PiecesContainerOpponent {pieces} />
+                    <div class="relative">
+                        <div id="game-bounds" class=" pt-6 pb-1 flex flex-col gap-2" on:dragover={updateMouseCoordinates} role="table">
+                            <PiecesContainerOpponent {pieces} />
 
-                        <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
-                        {#if boardData != null}
-                            <Board2
-                                {playerNumber}
-                                {boardData}
-                                {tileIds}
-                                dragLeaveHandler={dragLeave}
-                                dropHandler={drop}
-                                dragoverHandler={dragOverHandler}
-                            />
+                            <!-- Create the Tic-Tac-Toe grid with 3x3 cells -->
+                            {#if boardData != null}
+                                <Board2
+                                    {playerNumber}
+                                    {boardData}
+                                    {tileIds}
+                                    dragLeaveHandler={dragLeave}
+                                    dropHandler={drop}
+                                    dragoverHandler={dragOverHandler}
+                                />
+                            {/if}
+
+                            <!-- Create draggable elements -->
+                            <PiecesContainer {pieces} {playerWithTurn} {playerNumber} {drag} {dragStart} {dragEnd} {mouseDown} />
+                        </div>
+
+                        {#if showWinScreen}
+                            <div
+                                class="absolute inset-0 bg-white bg-opacity-5 backdrop-blur-sm flex flex-col items-center justify-center gap-2 z-50"
+                            >
+                                <!-- Your loading indicator or content goes here -->
+                                <span class="text-xl">{winMessage}</span>
+                                <div class="flex gap-2">
+                                    <button class="btn btn-circle btn-outline" on:click={playAgain}>
+                                        <svg
+                                            fill="#000000"
+                                            version="1.1"
+                                            id="Capa_1"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            xmlns:xlink="http://www.w3.org/1999/xlink"
+                                            viewBox="-39.18 -39.18 156.73 156.73"
+                                            xml:space="preserve"
+                                            ><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g
+                                                id="SVGRepo_tracerCarrier"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            ></g><g id="SVGRepo_iconCarrier">
+                                                <g>
+                                                    <path
+                                                        d="M78.049,19.015L29.458,67.606c-0.428,0.428-1.121,0.428-1.548,0L0.32,40.015c-0.427-0.426-0.427-1.119,0-1.547l6.704-6.704 c0.428-0.427,1.121-0.427,1.548,0l20.113,20.112l41.113-41.113c0.429-0.427,1.12-0.427,1.548,0l6.703,6.704 C78.477,17.894,78.477,18.586,78.049,19.015z"
+                                                    ></path>
+                                                </g>
+                                            </g></svg
+                                        >
+                                    </button>
+                                    <button class="btn btn-circle btn-outline" on:click={closeWinScreen}>
+                                        <svg viewBox="-5.28 -5.28 34.56 34.56" fill="none" xmlns="http://www.w3.org/2000/svg"
+                                            ><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g
+                                                id="SVGRepo_tracerCarrier"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            ></g><g id="SVGRepo_iconCarrier">
+                                                <g id="Menu / Close_MD">
+                                                    <path
+                                                        id="Vector"
+                                                        d="M18 18L12 12M12 12L6 6M12 12L18 6M12 12L6 18"
+                                                        stroke="#000000"
+                                                        stroke-width="2"
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                    ></path>
+                                                </g>
+                                            </g></svg
+                                        >
+                                    </button>
+                                </div>
+                            </div>
                         {/if}
-
-                        <!-- Create draggable elements -->
-                        <PiecesContainer {pieces} {playerWithTurn} {playerNumber} {drag} {dragStart} {dragEnd} {mouseDown} />
                     </div>
                     <!-- your turn prompt -->
                     {#if playerWithTurn == playerNumber}

@@ -44,7 +44,7 @@
 
 <div class="pieces-container flex items-center justify-center gap-1 p-1">
     {#each pieces as piece (piece.size)}
-        <div class="draggable cursor-move mx-auto z-50" style="width: {piece.size}px; height: {piece.size}px;"
+        <div class="draggable cursor-move mx-auto z-40" style="width: {piece.size}px; height: {piece.size}px;"
             size={piece.size}
             draggable={playerWithTurn == playerNumber}
             id={"" + piece.size}
