@@ -588,7 +588,7 @@
                     {#if playerWithTurn == playerNumber}
                         <p>Your turn to move</p>
                     {:else}
-                        <p>{opponentName}'s turn to move</p>
+                        <p>Opponent's turn to move</p>
                     {/if}
                 </div>
 
