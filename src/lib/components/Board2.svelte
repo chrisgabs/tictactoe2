@@ -15,7 +15,6 @@
     });
 
     function setUpBoardDataAfterJoining(playerNumber, boardData) {
-        console.log("board data:");
         // update board cell ids
         let elements = document.getElementById("board").children;
         for (let i = 0; i < elements.length; i++) {

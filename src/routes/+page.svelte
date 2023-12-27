@@ -4,6 +4,7 @@
     import Board2 from "$lib/components/Board2.svelte";
     import PiecesContainer from "$lib/components/PiecesContainer.svelte";
     import PiecesContainerOpponent from "$lib/components/PiecesContainerOpponent.svelte";
+    import DummyBoard from "$lib/components/DummyBoard.svelte";
     import Console from "$lib/components/Console.svelte";
     import { API_BASE_URL } from "$lib/config/constants";
 
@@ -44,7 +45,6 @@
         // Retrieve session informtion from backend
         setUpBoardData(1);
         (async () => {
-            console.log("------- connect -------");
             const response = await fetch("https://" + SERVER_ADDRESS + "/connect", {
                 // const response = await fetch("http://" + "192.168.19.7:8080" + "/connect", {
                 method: "GET",
@@ -56,7 +56,6 @@
 
             if (response.ok) {
                 const data = await response.json();
-                console.log(data);
                 displayName = data.displayName;
                 if (data.newPlayer) {
                     socket = new WebSocket("wss://" + SERVER_ADDRESS + "/ws/newPlayer");
@@ -75,8 +74,8 @@
                 console.log("Error in receiving session information");
             }
         })();
-        let elements = document.getElementById("board");
-        console.log(elements);
+        // let elements = document.getElementById("board");
+        // console.log(elements);
         // document.addEventListener("mousemove", handleMouseMove)
     });
 
@@ -105,8 +104,6 @@
 
         socket.onmessage = (message) => {
             const received = JSON.parse(message.data);
-            console.log("WS received: --");
-            console.log(received);
             const eventType = received.EventType;
             const data = received.Data;
             // console.log(eventType);
@@ -117,7 +114,6 @@
                     boardData = data.boardData;
                     playerWithTurn = data.playerWithTurn;
                     opponentName = data.opponentDisplayName;
-                    console.log(data);
                     // setUpBoardDataAfterJoining(data.playerNumber, data.boardData);
                     break;
                 case "move":
@@ -542,19 +538,21 @@
     }
 </script>
 
-<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300" id="cursor" />
-<div class="absolute left-5 top-5">Player: {playerNumber}</div>
+<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300 hidden" id="cursor" />
+<!-- <div class="absolute left-5 top-5">Player: {playerNumber}</div>
 <div class="absolute left-5 top-10">Opponent: {opponentName}</div>
-<div class="absolute left-5 top-20">Room: {roomId}</div>
+<div class="absolute left-5 top-20">Room: {roomId}</div> -->
 
 <div id="container" class="w-screen h-screen flex flex-col items-center justify-center">
-    <div class="flex flex-col gap-2 justify-center align-middle text-center">
-        <p>Your Room Number: {roomId}</p>
-        <div class="flex space-x-2">
-            <input id="room-input" type="text" placeholder="Enter Room Number" class="input input-bordered w-full max-w-xs" />
-            <button class="p-2 btn btn-outline" on:click={joinRoom}>Join Room</button>
+    {#if playerNumber != null}
+        <div class="flex flex-col gap-2 justify-center align-middle text-center">
+            <p>Your Room Number: {roomId}</p>
+            <div class="flex space-x-2">
+                <input id="room-input" type="text" placeholder="Enter Room Number" class="input input-bordered w-full max-w-xs" />
+                <button class="p-2 btn btn-outline" on:click={joinRoom}>Join Room</button>
+            </div>
         </div>
-    </div>
+    {/if}
 
     <div class="flex flex-col sm:flex-row gap-4">
         {#key gameResets}
@@ -586,16 +584,12 @@
                         <p>{opponentName}'s turn to move</p>
                     {/if}
                 </div>
-            {:else}
-                <p>Connecting...</p>
-            {/if}
 
-            <Console
-                {resetGame}
-                {leaveRoom}
-                {displayName}
-                {opponentName}
-            />
+                <Console {resetGame} {leaveRoom} {displayName} {opponentName} />
+            {:else}
+                <!-- <p>Connecting...</p> -->
+                <DummyBoard {maxSize} {minSize} {numPieces} />
+            {/if}
         {/key}
     </div>
 </div>
