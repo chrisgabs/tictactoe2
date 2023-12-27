@@ -223,6 +223,8 @@
 
     function handleOpponentDragEnd(data) {
         const piece = document.getElementById("opponent-" + data.piece);
+        const toRemove = document.getElementById("opponent-indicator");
+        piece.removeChild(toRemove);
         piece.style.transform = `translate(0px, 0px)`;
         opponentDragging = false;
     }
@@ -282,6 +284,11 @@
         const cursorElement = document.getElementById("cursor");
         const opponentPiece = document.getElementById("opponent-" + data.PieceID);
         if (!opponentDragging) {
+            const newElement = document.createElement("span");
+            newElement.className = "indicator-item badge opacity-70 indicator-bottom indicator-center";
+            newElement.textContent = "Opponent";
+            newElement.id = "opponent-indicator";
+            opponentPiece.appendChild(newElement);
             ogOpponentPieceCoords = opponentPiece.getBoundingClientRect();
             opponentDragging = true;
         }
