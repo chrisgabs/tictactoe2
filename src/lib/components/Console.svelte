@@ -13,7 +13,7 @@
             <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-300"></span>
             <div class="text-start flex-grow">
                 <h2 class="font-bold">You</h2>
-                <div class="text-sm">1 Wins</div>
+                <div class="text-sm">0 Wins</div>
             </div>
         </div>
 
@@ -22,7 +22,7 @@
                 <span class="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-300"></span>
                 <div class="text-start flex-grow">
                     <h2 class="font-bold">Opponent</h2>
-                    <div class="text-sm">1 Win</div>
+                    <div class="text-sm">0 Wins</div>
                 </div>
             </div>
         {:else}
