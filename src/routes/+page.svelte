@@ -5,7 +5,7 @@
     import PiecesContainerOpponent from "$lib/components/PiecesContainerOpponent.svelte";
     import DummyBoard from "$lib/components/DummyBoard.svelte";
     import Console from "$lib/components/Console.svelte";
-    // import { API_ENDPOINT } from '$lib/config/env.js';
+    import { API_ENDPOINT } from '$lib/config/env.js';
 
     let board = [
         [null, null, null],
@@ -13,7 +13,7 @@
         [null, null, null],
     ];
 
-    const SERVER_ADDRESS = import.meta.env.VITE_PUBLIC_API_URL;
+    const SERVER_ADDRESS = API_ENDPOINT;
 
     let gameResets = 0;
     let socket = null;

@@ -1,10 +1,3 @@
-// let API_ENDPOINT = "";
+let API_ENDPOINT = import.meta.env.VITE_PUBLIC_API_URL;
 
-// if (process.env.NODE_ENV === "production") { 
-    
-// }else {
-//     API_ENDPOINT = import.meta.env.VITE_SOME_KEY;
-// }
-
-export const API_ENDPOINT = process.env.API_ENDPOINT;
-
+export { API_ENDPOINT };
