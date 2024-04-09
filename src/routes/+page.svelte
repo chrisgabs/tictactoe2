@@ -135,9 +135,7 @@
                     handleGameReset(data);
                     break;
                 case "leave":
-                    opponentName = null;
-                    playerWithTurn = playerNumber;
-                    gameResets += 1;
+                    handleOpponentLeave();
                     break;
                 case "win":
                     handleWin(data);
@@ -209,7 +207,43 @@
 
     function handleOpponentJoin(data) {
         opponentName = data.opponentDisplayName;
-        return;
+        const container = document.createElement('div');
+        container.className = 'absolute right-4 bottom-4 w-64 h-12 rounded-lg shadow-lg outline outline-1 outline-green-500 bg-green-50 transition-all duration-300';
+        const innerContent = document.createElement('div');
+        innerContent.className = 'flex w-full h-full items-center justify-center';
+        const textNode = document.createElement('span');
+        textNode.textContent = 'Opponent has joined';
+        textNode.className = 'font-semibold';
+        innerContent.appendChild(textNode);
+        container.appendChild(innerContent);
+
+        setInterval(() => {
+            container.remove()
+        }, 6000);
+
+        document.body.appendChild(container);
+    }
+
+    function handleOpponentLeave(data) {
+        opponentName = null;
+        playerWithTurn = playerNumber;
+        gameResets += 1;
+
+        const container = document.createElement('div');
+        container.className = 'absolute right-4 bottom-4 w-64 h-12 rounded-lg shadow-lg outline outline-1 outline-red-500 bg-red-50 transition-all duration-300';
+        const innerContent = document.createElement('div');
+        innerContent.className = 'flex w-full h-full items-center justify-center';
+        const textNode = document.createElement('span');
+        textNode.textContent = 'Opponent has left';
+        textNode.className = 'font-semibold';
+        innerContent.appendChild(textNode);
+        container.appendChild(innerContent);
+
+        setInterval(() => {
+            container.remove()
+        }, 6000);
+
+        document.body.appendChild(container);
     }
 
     function handleOpponentDrop(data) {
@@ -562,7 +596,7 @@
     }
 </script>
 
-<div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300 hidden" id="cursor" />
+<!-- <div class="absolute w-2 h-2 bg-slate-800 transition-transform duration-300 hidden" id="cursor" /> -->
 <!-- <div class="absolute left-5 top-5">Player: {playerNumber}</div>
 <div class="absolute left-5 top-10">Opponent: {opponentName}</div>
 <div class="absolute left-5 top-20">Room: {roomId}</div> -->
