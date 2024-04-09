@@ -286,10 +286,9 @@
     }
 
     function setUpBoardDataAfterJoining(playerNumber, boardData) {
-        console.log("board data:");
         // update board cell ids
         let elements = document.getElementById("board").children;
-        console.log(elements);
+        
         for (let i = 0; i < elements.length; i++) {
             // console.log(elements[i])
             if (playerNumber == 1) {
@@ -655,7 +654,9 @@
                         {/if}
                     </div>
                     <!-- your turn prompt -->
-                    {#if playerWithTurn == playerNumber}
+                    {#if opponentName == null}
+                        <p>Join a room to start playing</p>
+                    {:else if playerWithTurn == playerNumber}
                         <p>Your turn to move</p>
                     {:else}
                         <p>Opponent's turn to move</p>
